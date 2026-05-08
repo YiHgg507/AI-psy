@@ -3,7 +3,6 @@
     <el-menu
       default-active="2"
       class="menu-style"
-      :router="true"
       :collapse="isCollapsed"
       :collapse-transition="false"
     >
@@ -19,6 +18,7 @@
         </div>
       </div>
       <el-menu-item
+        @click="selectMenu"
         v-for="item in router.options.routes[0].children"
         :key="item.path"
         :index="item.path"
@@ -36,8 +36,15 @@ import { useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/admin'
 import { computed } from 'vue'
 // 需要加href
-const iconUrl = new URL('../assets/机器人.png', import.meta.url).href
 const router = useRouter()
+const iconUrl = new URL('../assets/机器人.png', import.meta.url).href
+const selectMenu = (key) => {
+  // router.options.routes[0]就是根路由
+  // 包含path根路径和children子路由
+  const currentRoute = router.options.routes[0]
+  console.log(router)
+  router.push(`${currentRoute.path}/${key.index}`)
+}
 //直接加计算属性，不用加函数
 const isCollapsed = computed(() => useAdminStore().isCollapsed)
 </script>

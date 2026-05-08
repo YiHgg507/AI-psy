@@ -2,6 +2,7 @@
   <div class="page-head">
     <p class="page-title">{{ prors.title }}</p>
     <div class="action-btn">
+      <!-- 插槽 -->
       <slot name="buttons"></slot>
     </div>
   </div>
