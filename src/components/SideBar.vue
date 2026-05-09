@@ -43,6 +43,8 @@ const selectMenu = (key) => {
   // 包含path根路径和children子路由
   const currentRoute = router.options.routes[0]
   console.log(router)
+  console.log(key)
+  // 跳转至该路径
   router.push(`${currentRoute.path}/${key.index}`)
 }
 //直接加计算属性，不用加函数
