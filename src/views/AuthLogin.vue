@@ -35,6 +35,8 @@
 </template>
 <script setup>
 import { ref, reactive } from 'vue'
+import { login } from '@/api/admin'
+import { useRouter } from 'vue-router'
 const formData = reactive({
   username: '',
   password: ''
@@ -45,11 +47,27 @@ const rules = reactive({
 })
 
 const RuleFormRef = ref(null)
+
+const router = useRouter()
 const submitForm = (formEl) => {
   if (!formEl) return
   formEl.validate((valid) => {
     if (valid) {
-      console.log('submit!')
+      // 发送请求登录
+      login(formData).then((res) => {
+        // ！undefined ！'' ！null为true
+        // 返回的res.token有值，则!res.token为false跳过该步骤
+        if (!res.token) {
+          return console.log('登录失败')
+        }
+        // 登录成功，存储token和用户信息
+        localStorage.setItem('token', res.token)
+        localStorage.setItem('userInfo', JSON.stringify(res.userInfo))
+        // 根据用户角色跳转不同页面
+        if (res.userInfo.userType === 2) {
+          router.push('/back/Dashboard')
+        }
+      })
     } else {
       console.log('error submit!')
     }
