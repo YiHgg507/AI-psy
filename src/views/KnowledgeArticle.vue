@@ -111,14 +111,24 @@ const pagination = reactive({
 // 列表数据
 const tableData = ref([])
 
+// 保存最近的筛选条件，翻页/刷新时复用
+const lastFormData = ref({})
+
 const handleSearch = async (formData) => {
-  // console.log(formData, '查询参数')
-  const params = {
-    ...pagination,
-    ...formData
+  // 传了筛选条件就存下来，没传就用上次的
+  if (formData) {
+    lastFormData.value = formData
   }
+  const params = {
+    ...pagination
+  }
+  // 过滤掉空值和"全部"选项
+  Object.entries(lastFormData.value).forEach(([key, value]) => {
+    if (value !== undefined && value !== '' && value !== 'all') {
+      params[key] = value
+    }
+  })
   const { records, total } = await articlePage(params)
-  // console.log(data, '分页数据')
   tableData.value = records
   pagination.total = total
   console.log('表单数据', tableData.value)

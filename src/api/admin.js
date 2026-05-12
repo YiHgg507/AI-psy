@@ -1,5 +1,7 @@
 import service from '@/utils/request'
 // 需要username和password两个参数
+
+// 知识文章
 export function login(data) {
   return service.post('./user/login', data)
 }
@@ -44,4 +46,19 @@ export function changeArticleStatus(id, data) {
 
 export function deleteArticle(id) {
   return service.delete(`/knowledge/article/${id}`)
+}
+
+// 获取咨询记录列表
+export function getSessionChat(params) {
+  return service.get('/psychological-chat/sessions', { params })
+}
+
+// 获取咨询记录详情
+export function getSessionDetail(sessionId) {
+  return service.get(`/psychological-chat/sessions/${sessionId}/messages`)
+}
+
+// 情绪日记
+export function getMoodList(params) {
+  return service.get('/emotion-diary/admin/page', { params })
 }

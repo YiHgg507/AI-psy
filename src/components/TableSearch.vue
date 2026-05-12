@@ -12,7 +12,7 @@
               :placeholder="item.placeholder"
             >
               <template v-if="item.comp === 'select'">
-                <el-option label="全部" value=""></el-option>
+                <el-option label="全部" value="all"></el-option>
                 <el-option
                   v-for="opt in item.options"
                   :key="opt.value"
@@ -47,6 +47,12 @@ const ruleFormRef = ref(null)
 const emit = defineEmits(['search'])
 
 const formData = reactive({})
+// select 字段设默认值 "all"，匹配"全部"选项
+props.formItem.forEach((item) => {
+  if (item.comp === 'select') {
+    formData[item.prop] = 'all'
+  }
+})
 //增加列宽
 const formItemArrs = computed(() => {
   return props.formItem.map((item) => ({
