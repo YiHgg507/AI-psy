@@ -1,0 +1,2 @@
+- [Compaction priorities](memory/feedback_compaction_priorities.md) — user wants compaction to preserve bugs, checkpoints, business logic, and key knowledge points
+- [Bugs and patterns](memory/bugs-and-patterns.md) — recorded bugs/fixes and error-prone Vue/Element Plus patterns

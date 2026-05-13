@@ -36,20 +36,20 @@ service.interceptors.response.use(
     // 否则的话抛出错误
     if (data.code === '200' || data.code === 200) {
       return data.data
-    } else {
-      if (data.code === -1) {
-        if (!config.url?.includes('/login')) {
-          ElMessage.error(data.msg || '登录过期，请重新登录')
-          // 清除token
-          localStorage.removeItem('token')
-          localStorage.removeItem('userInfo')
-          window.location.href = 'auth/login'
-        } else {
-          ElMessage.error(data.msg || '登录过期，请重新登录')
-          return Promise.reject('网络请求失败')
-        }
-      }
     }
+    if (data.code === -1) {
+      if (!config.url?.includes('/login')) {
+        ElMessage.error(data.msg || '登录过期，请重新登录')
+        localStorage.removeItem('token')
+        localStorage.removeItem('userInfo')
+        window.location.href = 'auth/login'
+      } else {
+        ElMessage.error(data.msg || '登录过期，请重新登录')
+      }
+      return Promise.reject('网络请求失败')
+    }
+    // 其他非200状态码，返回原始响应数据让调用方自行处理
+    return data
   },
   (error) => {
     console.log('err' + error) // for debug

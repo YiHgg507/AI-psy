@@ -62,3 +62,19 @@ export function getSessionDetail(sessionId) {
 export function getMoodList(params) {
   return service.get('/emotion-diary/admin/page', { params })
 }
+
+// 删除情绪日记记录
+
+export function deleteMoodRecord(id) {
+  return service.delete(`/emotion-diary/admin/${id}`)
+}
+
+// 获取综合分析
+export function getComAnalysis() {
+  return service.get('/data-analytics/overview')
+}
+
+// 退出登录
+export function logout() {
+  return service.post('/user/logout')
+}
