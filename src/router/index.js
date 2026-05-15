@@ -61,41 +61,64 @@ const backendRoutes = [
     ]
   }
 ]
+
+const FrontendRoutes = [
+  {
+    path: '/',
+    component: () => import('@/views/FrontendLayout.vue'),
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/userHome.vue')
+      },
+      {
+        path: '/consulatation',
+        component: () => import('@/views/userConsulatation.vue')
+      },
+      {
+        path: '/emotion-diary',
+        component: () => import('@/views/userEmotionDiary.vue')
+      },
+      {
+        path: '/knowledge',
+        component: () => import('@/views/userKnowledge.vue')
+      }
+    ]
+  }
+]
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes: backendRoutes
+  routes: [...backendRoutes, ...FrontendRoutes]
 })
 
 // 路由前置守卫
-router.beforeEach((to, from, next) => {
-  // 获取token
+router.beforeEach((to, from) => {
   const token = localStorage.getItem('token')
-  // 如果是登录页面，并且token存在，则跳转到首页
+
   if (token) {
-    // 判断是用户还是后台
     const userInfo = JSON.parse(localStorage.getItem('userInfo'))
-    // 如果是后台
+    // 管理员
     if (userInfo.userType === 2) {
-      // 在后台页面可进行下一步
       if (to.path.startsWith('/back')) {
-        next()
-      } else {
-        // 胡乱输入则跳转到后台页面
-        next('/back/dashboard')
+        return true
       }
-      // 如果是用户 还没写
-    } else if (userInfo.userType === 1) {
+      return '/back/dashboard'
     }
-    // 如果是前台
-  } else {
-    // 如果是后台页面则跳转到登录页面
-    if (to.path.startsWith('/back')) {
-      next('/auth/login')
-    } else {
-      // 否则正常进行下一步
-      next()
+    // 普通用户
+    if (userInfo.userType === 1) {
+      if (to.path.startsWith('/back') || to.path.startsWith('/auth')) {
+        return '/'
+      }
+      return true
     }
   }
+
+  // 未登录访问后台页面，重定向到登录页
+  if (to.path.startsWith('/back')) {
+    return '/auth/login'
+  }
+  return true
 })
 
 export default router

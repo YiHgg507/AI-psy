@@ -38,6 +38,9 @@ service.interceptors.response.use(
       return data.data
     }
     if (data.code === -1) {
+      if (config.url?.includes('/user/add')) {
+        return data
+      }
       if (!config.url?.includes('/login')) {
         ElMessage.error(data.msg || '登录过期，请重新登录')
         localStorage.removeItem('token')

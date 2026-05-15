@@ -46,6 +46,7 @@ declare module 'vue' {
     ElTableColumn: typeof import('element-plus/es')['ElTableColumn']
     ElTag: typeof import('element-plus/es')['ElTag']
     ElUpload: typeof import('element-plus/es')['ElUpload']
+    MarkdownRenderer: typeof import('./components/MarkdownRenderer.vue')['default']
     NavBar: typeof import('./components/NavBar.vue')['default']
     PageHead: typeof import('./components/PageHead.vue')['default']
     RichTextEditor: typeof import('./components/RichTextEditor.vue')['default']

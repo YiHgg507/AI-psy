@@ -1,7 +1,7 @@
 <template>
   <div class="container">
     <div class="title">
-      <div class="back-home">
+      <div class="back-home" @click="router.push('/')">
         <el-icon><Back /></el-icon>
         <span>返回首页</span>
       </div>
@@ -36,6 +36,7 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { login } from '@/api/admin'
+import { ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 const formData = reactive({
   username: '',
@@ -55,10 +56,14 @@ const submitForm = (formEl) => {
     if (valid) {
       // 发送请求登录
       login(formData).then((res) => {
-        // ！undefined ！'' ！null为true
+        // ！undefined   ！''   ！null  为true
         // 返回的res.token有值，则!res.token为false跳过该步骤
         if (!res.token) {
-          return console.log('登录失败')
+          ElMessageBox.alert(res.msg || res.message || '登录失败，请稍后重试', '登录失败', {
+            type: 'error',
+            confirmButtonText: '确定'
+          })
+          return
         }
         // 登录成功，存储token和用户信息
         localStorage.setItem('token', res.token)
@@ -66,10 +71,10 @@ const submitForm = (formEl) => {
         // 根据用户角色跳转不同页面
         if (res.userInfo.userType === 2) {
           router.push('/back/Dashboard')
+        } else {
+          router.push('/')
         }
       })
-    } else {
-      console.log('error submit!')
     }
   })
 }
@@ -80,6 +85,7 @@ const submitForm = (formEl) => {
   .title {
     .back-home {
       margin-bottom: 30px;
+      cursor: pointer;
     }
     .title-text {
       text-align: center;
