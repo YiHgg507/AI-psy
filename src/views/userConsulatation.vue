@@ -74,61 +74,67 @@
       </div>
       <!-- 聊天框初始显示 -->
       <div class="chat-messages">
-        <template v-if="message.length === 0">
-          <div class="message-item ai-message">
-            <div class="message-avatar">
-              <el-image :src="iconURL1" style="width: 20px"></el-image>
+        <div class="message-item ai-message" v-if="messages.length === 0">
+          <div class="message-avatar">
+            <el-image :src="iconURL1" style="width: 20px"></el-image>
+          </div>
+          <div class="message-content">
+            <div class="message-bubble">
+              您好，我是您的心理AI助手，很高兴陪伴您，为您提供温暖的心理支持，请告诉我，今天您感觉怎么样？有什么想要分享的吗？
             </div>
-            <div class="message-content">
-              <div class="message-bubble">
-                您好，我是您的心理AI助手，很高兴陪伴您，为您提供温暖的心理支持，请告诉我，今天您感觉怎么样？有什么想要分享的吗？
+            <div class="message-time">刚刚</div>
+          </div>
+        </div>
+
+        <div
+          class="message-item"
+          v-for="msg in messages"
+          :key="msg.id"
+          :class="msg.senderType === 1 ? 'user-message' : 'ai-message'"
+        >
+          <div class="message-avatar">
+            <el-image v-if="msg.senderType === 1" :src="iconURL3" style="width: 20px"></el-image>
+            <el-image v-if="msg.senderType === 2" :src="iconURL1" style="width: 20px"></el-image>
+          </div>
+
+          <div class="message-content">
+            <div class="message-bubble">
+              <div
+                class="typing-indicator"
+                v-if="
+                  msg.senderType === 2 &&
+                  isAISending &&
+                  !msg.content &&
+                  msg.id === streamingMessageId
+                "
+              >
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
               </div>
-              <div class="message-time">刚刚</div>
+
+              <div class="error-message" v-else-if="msg.isError">
+                <p>{{ msg.content }}</p>
+              </div>
+
+              <MarkDownRenderer
+                v-else-if="msg.senderType === 2 && !msg.isError"
+                :content="msg.content"
+                :is-ai-message="true"
+              />
+
+              <p v-else-if="msg.content" v-html="formatMessageContent(msg.content)"></p>
+            </div>
+
+            <div class="message-time">
+              {{
+                msg.senderType === 2 && isAISending && msg.id === streamingMessageId
+                  ? '正在输入中...'
+                  : formatTime(msg.createdAt)
+              }}
             </div>
           </div>
-        </template>
-
-        <template v-else>
-          <div
-            class="message-item"
-            v-for="msg in message"
-            :key="msg.id"
-            :class="msg.messageType === 1 ? 'user-message' : 'ai-message'"
-          >
-            <div class="message-avatar">
-              <el-image v-if="msg.messageType === 1" :src="iconURL3"></el-image>
-              <el-image v-if="msg.messageType === 2" :src="iconURL1"></el-image>
-            </div>
-            <div class="message-content">
-              <div class="message-bubble">
-                <div
-                  class="typing-indicator"
-                  v-if="msg.messageType === 2 && isAISending && !msg.content"
-                >
-                  <div class="typing-dot"></div>
-                  <div class="typing-dot"></div>
-                  <div class="typing-dot"></div>
-                </div>
-
-                <div class="error-message" v-else-if="msg.isError">
-                  <p>{{ msg.content }}</p>
-                </div>
-
-                <MarkDownRenderer
-                  v-else-if="msg.messageType === 2 && !msg.isError"
-                  :content="msg.content"
-                  :is-ai-message="true"
-                />
-
-                <p v-else-if="msg.content" v-html="formatMessageContent(msg.content)"></p>
-              </div>
-
-              <div class="message-time">
-                {{ msg.messageType === 2 && isAISending ? '正在输入中...' : msg.createdAt }}
-              </div>
-            </div>
-          </div>
-        </template>
+        </div>
       </div>
       <div class="chat-input">
         <div class="input-container">
@@ -140,6 +146,7 @@
             :rows="3"
             :disabled="isAISending"
             @keydown.enter="handleKeydown"
+            resize="none"
             clearable
           ></el-input>
           <div class="input-footer">
@@ -148,7 +155,7 @@
           </div>
         </div>
         <el-button
-          :disabled="!userMessage.trim() && userMessage.length > 500"
+          :disabled="!userMessage.trim() || userMessage.length > 500 || isAISending"
           class="send-btn"
           type="primary"
           @click="sendMessage"
@@ -163,7 +170,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { startSession, getSessionList, deleteSession, getSessionDetail } from '@/api/frontend'
-import { ElMessage } from 'element-plus'
+import { dateEquals, ElMessage } from 'element-plus'
 import MarkDownRenderer from '@/components/MarkdownRenderer.vue'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 
@@ -180,6 +187,7 @@ const createNewFrontendSession = () => {
     sessionTitle: '新会话'
   }
   currentSession.value = NewSession
+  messages.value = []
 }
 
 // 新建会话接口函数定义
@@ -208,13 +216,26 @@ const startNewSession = (message) => {
     if (currentSession.value && currentSession.value.status === 'TEMP') {
       // 更新为正式会话
       Object.assign(currentSession.value, sessionData)
-      //更新会话列表
-      getSessionPageList()
-      // 流式对话
-      startAIResponse()
+    } else if (!currentSession.value) {
+      // 没有会话时直接创建
+      currentSession.value = sessionData
     }
+    // 更新会话列表
+    getSessionPageList()
+    // 添加用户消息
+    messages.value.push({
+      id: Date.now(),
+      senderType: 1,
+      content: message,
+      createdAt: new Date().toISOString()
+    })
+    // 流式对话
+    startAIResponse(sessionData.sessionId, message)
   })
 }
+
+const activeStreamCtrl = ref(null)
+const streamingMessageId = ref(null)
 
 const startAIResponse = (sessionId, userMessage) => {
   // 防止重复发送
@@ -222,17 +243,21 @@ const startAIResponse = (sessionId, userMessage) => {
     ElMessage.error('AI助手正在输入中，请稍后')
     return
   }
+  // 中断旧的 SSE 连接
+  activeStreamCtrl.value?.abort()
   isAISending.value = true
   const AIMessage = {
     id: `ai_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
     senderType: 2,
     content: '',
-    createdAt: Date.now().toISOString()
+    createdAt: new Date().toISOString()
   }
-  message.value.push(AIMessage)
+  messages.value.push(AIMessage)
+  streamingMessageId.value = AIMessage.id
 
   //调用流式接口
   const ctrl = new AbortController() //用来终止fetch
+  activeStreamCtrl.value = ctrl
   fetchEventSource('/api/psychological-chat/stream', {
     method: 'POST',
     headers: {
@@ -245,9 +270,19 @@ const startAIResponse = (sessionId, userMessage) => {
       userMessage
     }),
     signal: ctrl.signal,
-    onopen: (response) => {
-      if (response.headers.get('Content-Type') !== 'text/event-stream') {
-        ElMessage.error('服务器返回非流式数据')
+    onopen: async (response) => {
+      if (response.ok && response.headers.get('Content-Type') !== 'text/event-stream') {
+        ElMessage.warning('服务器返回非流式数据')
+      }
+      if (!response.ok) {
+        let errorMsg = `请求失败 (${response.status})`
+        try {
+          const body = await response.text()
+          if (body) errorMsg += `: ${body}`
+        } catch {
+          // ignore
+        }
+        throw new Error(errorMsg)
       }
     },
     onmessage: (event) => {
@@ -255,26 +290,34 @@ const startAIResponse = (sessionId, userMessage) => {
       if (!raw) return
       const eventName = event.event
       // 当前会话的AI消息
-      const AIMessage = message.value[message.value.length - 1]
+      const AIMessage = messages.value[messages.value.length - 1]
 
       if (eventName === 'done') {
         isAISending.value = false
+        streamingMessageId.value = null
         ctrl.abort()
         return
       }
-      const payload = JSON.parse(raw)
-      const ok = String(payload.code) === '200'
-      if (ok && payload.data && payload.data.content) {
-        AIMessage.content += payload.data.content
-      } else if (!ok) {
-        handleError(payload.message || 'AI回复失败')
+      try {
+        const payload = JSON.parse(raw)
+        const ok = String(payload.code) === '200'
+        if (ok && payload.data && payload.data.content) {
+          AIMessage.content += payload.data.content
+        } else if (!ok) {
+          handleError(payload.message || 'AI回复失败')
+        }
+      } catch {
+        // JSON 解析失败，忽略非法数据
       }
     },
     onerror: (err) => {
-      handleError(err || 'AI回复失败')
+      streamingMessageId.value = null
+      const msg = err?.message || err?.toString() || 'AI回复失败'
+      handleError(msg)
       throw err
     },
     onclose: () => {
+      streamingMessageId.value = null
       // 开始情绪分析
     }
   })
@@ -282,7 +325,8 @@ const startAIResponse = (sessionId, userMessage) => {
 
 // 错误处理函数
 const handleError = (error) => {
-  const AIMessage = message.value[message.value.length - 1]
+  streamingMessageId.value = null
+  const AIMessage = messages.value[messages.value.length - 1]
   if (AIMessage) {
     AIMessage.content = 'AI回复失败,请重试'
   }
@@ -304,6 +348,15 @@ const sendMessage = () => {
   // 如果是临时会话或者没有会话，就调用接口创建新会话
   if (!currentSession.value || currentSession.value?.status === 'TEMP') {
     startNewSession(message)
+  } else {
+    // 已存在会话：直接推送用户消息并调用 AI
+    messages.value.push({
+      id: Date.now(),
+      senderType: 1,
+      content: message,
+      createdAt: new Date().toISOString()
+    })
+    startAIResponse(currentSession.value.sessionId, message)
   }
 }
 
@@ -318,7 +371,7 @@ const getSessionPageList = async () => {
 }
 
 // 接收会话消息列表
-const message = ref([])
+const messages = ref([])
 const handleSessionClick = async (session) => {
   const res = await getSessionDetail(session.id)
   // 更新会话数据
@@ -329,18 +382,33 @@ const handleSessionClick = async (session) => {
   }
   currentSession.value = sessionData
   console.log(res)
-  message.value = res
+  messages.value = res
 }
 const handleKeydown = (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
+    sendMessage()
   }
 }
 
 const handleDeleteSession = async (sessionId) => {
   await deleteSession(sessionId)
   ElMessage.success('删除成功')
+  // 如果删除的是当前会话，清空聊天区
+  if (currentSession.value && currentSession.value.sessionId === 'session_' + sessionId) {
+    currentSession.value = null
+    messages.value = []
+  }
   getSessionPageList()
+}
+
+// 格式化时间
+const formatTime = (time) => {
+  if (!time) return ''
+  const d = new Date(time)
+  if (isNaN(d.getTime())) return time
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 // 处理用户输入文本
