@@ -17,7 +17,64 @@
         <div class="garden-header">
           <div class="garden-title">情绪花园</div>
         </div>
-        <div class="emotion-info"></div>
+        <div class="emotion-info">
+          <div class="emotion-name">中性</div>
+          <div class="emotion-score">50</div>
+        </div>
+        <div class="warm-tips">
+          <div class="emotion-status-text">
+            <span class="status-label">今天感觉：</span>
+            <span class="status-emotion">{{
+              currentEmotion.isNegative ? '需要关注' : '很不错'
+            }}</span>
+          </div>
+          <div class="emotion-intensity">
+            <span class="intensity-dots">
+              <span
+                v-for="dot in 3"
+                :key="dot"
+                class="dot"
+                :class="{ active: getIntensityClass(currentEmotion.emotionScore) >= dot }"
+              ></span>
+            </span>
+            <span class="intensity-text">
+              {{ getRiskText(currentEmotion.risklevel) }}
+            </span>
+          </div>
+          <!-- 建议卡片 -->
+          <div class="warm-suggestion">
+            <div class="suggestion-icon">💝</div>
+            <div class="suggestion-content">
+              <div class="suggestion-title">给你的小建议</div>
+              <div class="suggestion-text" v-if="currentEmotion.suggestion">
+                {{ currentEmotion.suggestion }}
+              </div>
+            </div>
+          </div>
+          <!-- 治愈行动 -->
+          <div class="healing-actions" v-if="currentEmotion.improvementSuggestions.length > 0">
+            <div class="action-title">
+              <div class="actions-list">
+                <div
+                  class="action-item"
+                  v-for="action in currentEmotion.improvementSuggestions"
+                  :key="action"
+                >
+                  <div class="action-icon">✨</div>
+                  <div class="action-text">{{ action }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- 风险提醒 -->
+          <div class="risk-notice">
+            <div class="notice-icon">🤗</div>
+            <div class="notice-content">
+              <div class="notice-title">温馨提示</div>
+              <div class="notice-text">{{ currentEmotion.riskDescription }}</div>
+            </div>
+          </div>
+        </div>
       </div>
       <!-- 会话历史 -->
       <div class="session-history">
@@ -73,7 +130,7 @@
         </el-button>
       </div>
       <!-- 聊天框初始显示 -->
-      <div class="chat-messages">
+      <div ref="chatMessagesRef" class="chat-messages">
         <div class="message-item ai-message" v-if="messages.length === 0">
           <div class="message-avatar">
             <el-image :src="iconURL1" style="width: 20px"></el-image>
@@ -168,15 +225,60 @@
   </div>
 </template>
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { startSession, getSessionList, deleteSession, getSessionDetail } from '@/api/frontend'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import MarkDownRenderer from '@/components/MarkdownRenderer.vue'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 
 const iconURL1 = new URL('@/assets/robot-fill.png', import.meta.url).href
 const iconURL2 = new URL('@/assets/like.png', import.meta.url).href
 const iconURL3 = new URL('@/assets/users.png', import.meta.url).href
+
+// 情绪花园
+
+const currentEmotion = ref({
+  primaryEmotion: '中性',
+  emotionScore: 50,
+  isNegative: false,
+  risklevel: 0,
+  suggestion: '情绪状态平稳',
+  improvementSuggestions: [],
+  riskDescription: ''
+})
+// 获取强度等级
+const getIntensityClass = (score) => {
+  if (score >= 61) {
+    return 3
+  } else if (score >= 41) {
+    return 2
+  }
+  return 1
+}
+// 获取Risk
+const getRiskText = (level) => {
+  switch (level) {
+    case 0:
+      return '正常'
+    case 2:
+      return '关注'
+    case 3:
+      return '预警'
+    case 4:
+      return '危机'
+    default:
+      return '正常'
+  }
+}
+
+// 聊天滚动
+const chatMessagesRef = ref(null)
+const scrollToBottom = () => {
+  nextTick(() => {
+    const el = chatMessagesRef.value
+    if (el) el.scrollTop = el.scrollHeight
+  })
+}
 
 // 新建会话逻辑
 const currentSession = ref(null)
@@ -191,6 +293,7 @@ const createNewFrontendSession = () => {
   }
   currentSession.value = NewSession
   messages.value = []
+  scrollToBottom()
 }
 
 // 新建会话接口函数定义
@@ -232,6 +335,7 @@ const startNewSession = (message) => {
       content: message,
       createdAt: new Date().toISOString()
     })
+    scrollToBottom()
     // 流式对话
     startAIResponse(sessionData.sessionId, message)
   })
@@ -256,6 +360,7 @@ const startAIResponse = (sessionId, userMessage) => {
     createdAt: new Date().toISOString()
   }
   messages.value.push(AIMessage)
+  scrollToBottom()
   streamingMessageId.value = AIMessage.id
 
   //调用流式接口
@@ -306,6 +411,7 @@ const startAIResponse = (sessionId, userMessage) => {
         const ok = String(payload.code) === '200'
         if (ok && payload.data && payload.data.content) {
           AIMessage.content += payload.data.content
+          scrollToBottom()
         } else if (!ok) {
           handleError(payload.message || 'AI回复失败')
         }
@@ -361,6 +467,7 @@ const sendMessage = () => {
       content: message,
       createdAt: new Date().toISOString()
     })
+    scrollToBottom()
     startAIResponse(currentSession.value.sessionId, message)
   }
 }
@@ -389,6 +496,7 @@ const handleSessionClick = async (session) => {
   }
   currentSession.value = sessionData
   messages.value = res
+  scrollToBottom()
 }
 const handleKeydown = (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -398,9 +506,17 @@ const handleKeydown = (e) => {
 }
 
 const handleDeleteSession = async (sessionId) => {
+  try {
+    await ElMessageBox.confirm('确定要删除该会话吗？删除后不可恢复。', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+  } catch {
+    return
+  }
   await deleteSession(sessionId)
   ElMessage.success('删除成功')
-  // 如果删除的是当前会话，清空聊天区
   if (currentSession.value && currentSession.value.sessionId === 'session_' + sessionId) {
     currentSession.value = null
     messages.value = []
@@ -886,9 +1002,21 @@ onMounted(() => {
           }
         }
         &.user-message {
+          flex-direction: row-reverse;
           .message-avatar {
             background: linear-gradient(135deg, #6b7280, #4b5563);
             box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+          }
+          .message-content {
+            text-align: right;
+          }
+          .message-bubble {
+            display: inline-block;
+            text-align: left;
+            max-width: 100%;
+          }
+          .message-time {
+            text-align: right;
           }
         }
         .message-content {
