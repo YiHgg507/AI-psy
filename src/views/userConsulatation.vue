@@ -170,7 +170,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { startSession, getSessionList, deleteSession, getSessionDetail } from '@/api/frontend'
-import { dateEquals, ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import MarkDownRenderer from '@/components/MarkdownRenderer.vue'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 
@@ -181,6 +181,9 @@ const iconURL3 = new URL('@/assets/users.png', import.meta.url).href
 // 新建会话逻辑
 const currentSession = ref(null)
 const createNewFrontendSession = () => {
+  activeStreamCtrl.value?.abort()
+  isAISending.value = false
+  streamingMessageId.value = null
   const NewSession = {
     sessionId: `temp_${Date.now()}`,
     status: 'TEMP',
@@ -311,14 +314,16 @@ const startAIResponse = (sessionId, userMessage) => {
       }
     },
     onerror: (err) => {
-      streamingMessageId.value = null
       const msg = err?.message || err?.toString() || 'AI回复失败'
       handleError(msg)
-      throw err
     },
     onclose: () => {
+      const AIMessage = messages.value[messages.value.length - 1]
+      if (AIMessage && !AIMessage.content) {
+        AIMessage.content = 'AI回复中断，请重试'
+      }
+      isAISending.value = false
       streamingMessageId.value = null
-      // 开始情绪分析
     }
   })
 }
@@ -373,15 +378,16 @@ const getSessionPageList = async () => {
 // 接收会话消息列表
 const messages = ref([])
 const handleSessionClick = async (session) => {
+  activeStreamCtrl.value?.abort()
+  isAISending.value = false
+  streamingMessageId.value = null
   const res = await getSessionDetail(session.id)
-  // 更新会话数据
   const sessionData = {
     sessionId: 'session_' + session.id,
     status: 'ACTIVE',
     sessionTitle: session.sessionTitle
   }
   currentSession.value = sessionData
-  console.log(res)
   messages.value = res
 }
 const handleKeydown = (e) => {
