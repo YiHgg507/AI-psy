@@ -25,3 +25,13 @@ export function deleteSession(sessionId) {
 export function getSessionDetail(sessionId) {
   return service.get(`/psychological-chat/sessions/${sessionId}/messages`)
 }
+
+// 获取情绪分析结果
+export function getSessionEmotion(sessionId) {
+  return service.get(`/psychological-chat/session/${sessionId}/emotion`)
+}
+
+// 创建更新情绪日志
+export function addEmotionDiary(data) {
+  return service.post('/emotion-diary', data)
+}

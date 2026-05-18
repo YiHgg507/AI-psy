@@ -18,14 +18,16 @@
           <div class="garden-title">情绪花园</div>
         </div>
         <div class="emotion-info">
-          <div class="emotion-name">中性</div>
-          <div class="emotion-score">50</div>
+          <div class="emotion-name">
+            {{ emotionLabelMap[currentEmotion.primaryEmotion] || currentEmotion.primaryEmotion }}
+          </div>
+          <div class="emotion-score">{{ currentEmotion.emotionScore }}</div>
         </div>
         <div class="warm-tips">
           <div class="emotion-status-text">
             <span class="status-label">今天感觉：</span>
             <span class="status-emotion">{{
-              currentEmotion.isNegative ? '需要关注' : '很不错'
+              currentEmotion.isNegative ? '需要关注' : '还可以'
             }}</span>
           </div>
           <div class="emotion-intensity">
@@ -38,7 +40,7 @@
               ></span>
             </span>
             <span class="intensity-text">
-              {{ getRiskText(currentEmotion.risklevel) }}
+              {{ getRiskText(currentEmotion.riskLevel) }}
             </span>
           </div>
           <!-- 建议卡片 -->
@@ -67,7 +69,7 @@
             </div>
           </div>
           <!-- 风险提醒 -->
-          <div class="risk-notice">
+          <div class="risk-notice" v-if="currentEmotion.isNegative && currentEmotion.risklevel > 1">
             <div class="notice-icon">🤗</div>
             <div class="notice-content">
               <div class="notice-title">温馨提示</div>
@@ -226,7 +228,13 @@
 </template>
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
-import { startSession, getSessionList, deleteSession, getSessionDetail } from '@/api/frontend'
+import {
+  startSession,
+  getSessionList,
+  deleteSession,
+  getSessionDetail,
+  getSessionEmotion
+} from '@/api/frontend'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import MarkDownRenderer from '@/components/MarkdownRenderer.vue'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
@@ -236,16 +244,48 @@ const iconURL2 = new URL('@/assets/like.png', import.meta.url).href
 const iconURL3 = new URL('@/assets/users.png', import.meta.url).href
 
 // 情绪花园
+const emotionLabelMap = {
+  Happy: '开心',
+  joy: '喜悦',
+  excited: '兴奋',
+  calm: '平静',
+  relaxed: '放松',
+  contentment: '满足',
+  anticipation: '期待',
+  upset: '烦恼',
+  sadness: '悲伤',
+  anxious: '焦虑',
+  angry: '愤怒',
+  fear: '恐惧',
+  depression: '抑郁',
+  worried: '担忧',
+  frustrated: '沮丧',
+  neutral: '中性',
+  Surprised: '惊讶',
+  disgusted: '厌恶',
+  despair: '绝望'
+}
 
 const currentEmotion = ref({
   primaryEmotion: '中性',
   emotionScore: 50,
   isNegative: false,
-  risklevel: 0,
+  riskLevel: 0,
   suggestion: '情绪状态平稳',
   improvementSuggestions: [],
   riskDescription: ''
 })
+
+const loadSessionEmotion = async (sessionId) => {
+  const id = sessionId.toString().startsWith('session_') ? sessionId : 'session_' + sessionId
+  const res = await getSessionEmotion(id)
+  currentEmotion.value = {
+    improvementSuggestions: [],
+    riskDescription: '',
+    ...res
+  }
+}
+
 // 获取强度等级
 const getIntensityClass = (score) => {
   if (score >= 61) {
@@ -260,11 +300,11 @@ const getRiskText = (level) => {
   switch (level) {
     case 0:
       return '正常'
-    case 2:
+    case 1:
       return '关注'
-    case 3:
+    case 2:
       return '预警'
-    case 4:
+    case 3:
       return '危机'
     default:
       return '正常'
@@ -404,6 +444,7 @@ const startAIResponse = (sessionId, userMessage) => {
         isAISending.value = false
         streamingMessageId.value = null
         ctrl.abort()
+        setTimeout(() => loadSessionEmotion(currentSession.value.sessionId), 500)
         return
       }
       try {
@@ -430,6 +471,7 @@ const startAIResponse = (sessionId, userMessage) => {
       }
       isAISending.value = false
       streamingMessageId.value = null
+      loadSessionEmotion(currentSession.value.sessionId)
     }
   })
 }
@@ -485,10 +527,10 @@ const getSessionPageList = async () => {
 // 接收会话消息列表
 const messages = ref([])
 const handleSessionClick = async (session) => {
-  activeStreamCtrl.value?.abort()
   isAISending.value = false
   streamingMessageId.value = null
   const res = await getSessionDetail(session.id)
+  loadSessionEmotion(session.id)
   const sessionData = {
     sessionId: 'session_' + session.id,
     status: 'ACTIVE',
@@ -496,7 +538,6 @@ const handleSessionClick = async (session) => {
   }
   currentSession.value = sessionData
   messages.value = res
-  scrollToBottom()
 }
 const handleKeydown = (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -521,7 +562,8 @@ const handleDeleteSession = async (sessionId) => {
     currentSession.value = null
     messages.value = []
   }
-  getSessionPageList()
+  // 删除非当前会话时不触发全量重取，避免打断 SSE 流式渲染
+  sessionList.value = sessionList.value.filter((s) => s.id !== sessionId)
 }
 
 // 格式化时间
