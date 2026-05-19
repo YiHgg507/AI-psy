@@ -35,3 +35,12 @@ export function getSessionEmotion(sessionId) {
 export function addEmotionDiary(data) {
   return service.post('/emotion-diary', data)
 }
+
+// 查询知识文章列表
+
+export function getKnowledgeList(params) {
+  return service.get('/knowledge/article/page', { params })
+}
+// 获取知识文章详情
+
+export const getKnowledgeDetail = (articleId) => service.get(`/knowledge/article/${articleId}`)
